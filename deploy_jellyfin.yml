@@ -1,0 +1,101 @@
+- name: Desplegar Jellyfin con Caddy como proxy inverso usando Docker
+  hosts: vps
+  become: yes
+
+  tasks:
+    - name: Actualizar el sistema
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Instalar dependencias
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+        state: present
+
+    - name: Crear red Docker
+      docker_network:
+        name: jellyfin_network
+
+    - name: Crear red para proxy
+      docker_network:
+        name: proxy_network
+
+    - name: Crear directorios para Jellyfin
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /opt/jellyfin/media
+        - /opt/jellyfin/config
+        - /opt/jellyfin/clips
+
+    - name: Descargar clips de muestra
+      get_url:
+        url: "{{ item.url }}"
+        dest: "/opt/jellyfin/clips/{{ item.name }}"
+      loop:
+        - { url: "https://samplelib.com/lib/preview/mp4/sample-5s.mp4", name: "clip1.mp4" }
+        - { url: "https://samplelib.com/lib/preview/mp4/sample-10s.mp4", name: "clip2.mp4" }
+        - { url: "https://samplelib.com/lib/preview/mp4/sample-15s.mp4", name: "clip3.mp4" }
+
+    - name: Desplegar Jellyfin en Docker
+      docker_container:
+        name: jellyfin
+        image: jellyfin/jellyfin
+        state: started
+        restart_policy: always
+        networks:
+          - name: jellyfin_network
+          - name: proxy_network
+        volumes:
+          - "/opt/jellyfin/config:/config"
+          - "/opt/jellyfin/media:/media"
+          - "/opt/jellyfin/clips:/media/clips"
+        ports:
+          - "8096:8096"
+
+    - name: Esperar a que el contenedor de Jellyfin esté en ejecución
+      command: docker inspect -f '{{"{{"}} .State.Running {{"}}"}}' jellyfin
+      register: jellyfin_status
+      until: jellyfin_status.stdout == "true"
+      retries: 10
+      delay: 5
+
+    - name: Crear archivo de configuración de Caddy
+      copy:
+        dest: /etc/caddy/Caddyfile
+        content: |
+          jellyfin.yesweresysadmin.cat {
+            reverse_proxy http://jellyfin:8096
+            tls nalvali057@g.educaand.es
+          }
+        force: yes
+
+    - name: Desplegar Caddy
+      docker_container:
+        name: caddy
+        image: caddy:latest
+        state: started
+        restart_policy: always
+        networks:
+          - name: proxy_network
+        ports:
+          - "80:80"
+          - "443:443"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock:ro
+          - /etc/caddy:/etc/caddy
+        command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+
+    - name: Reiniciar Jellyfin
+      docker_container:
+        name: jellyfin
+        restart: yes
