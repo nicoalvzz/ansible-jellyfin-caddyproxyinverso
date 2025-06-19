@@ -73,9 +73,9 @@
       copy:
         dest: /etc/caddy/Caddyfile
         content: |
-          jellyfin.yesweresysadmin.cat {
+          jellyfin.**************.*** {
             reverse_proxy http://jellyfin:8096
-            tls nalvali057@g.educaand.es
+            tls ********@************
           }
         force: yes
 
@@ -98,4 +98,4 @@
     - name: Reiniciar Jellyfin
       docker_container:
         name: jellyfin
-        restart: yes
+        state: restarted
