@@ -74,9 +74,9 @@ Si deseas cambiar el dominio o el correo para los certificados SSL, edita esta s
   copy:
     dest: /etc/caddy/Caddyfile
     content: |
-      jellyfin.yesweresysadmin.cat {
+      jellyfin.**************.*** {
         reverse_proxy jellyfin:8096
-        tls nalvali057@g.educaand.es
+        tls ********@************
       }
     force: yes
 ```
